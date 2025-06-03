@@ -51,11 +51,10 @@ class ZLibraryDownloader:
                 elif isinstance(cookie, tuple) and len(cookie) == 2:
                     formatted_cookies[cookie[0]] = cookie[1]
             
-            print(f"Loaded {len(formatted_cookies)} cookies")
             return formatted_cookies
             
         except Exception as e:
-            print(f"Error loading cookies: {e}")
+            print(f"❌ Error loading cookies: {e}")
             return {}
     
     def _get_headers(self, user_agent=None):
@@ -77,7 +76,6 @@ class ZLibraryDownloader:
             limit=1, limit_per_host=1, ssl=False, 
             enable_cleanup_closed=True, force_close=True
         )
-
     
     async def _download_file(self, session, url, output_path, user_agent=None, max_retries=3):
         """Download a single file with retry logic."""
@@ -98,7 +96,6 @@ class ZLibraryDownloader:
                     # Validate content (avoid HTML error pages)
                     if b'<html' in content[:100].lower() or len(content) < 1024:
                         if b'<html' in content[:100].lower():
-                            print(f"Error: Got HTML instead of file for {url}")
                             if attempt < max_retries - 1:
                                 continue
                             return False
@@ -107,11 +104,9 @@ class ZLibraryDownloader:
                     async with aiofiles.open(output_path, 'wb') as f:
                         await f.write(content)
                     
-                    print(f"Downloaded: {output_path} ({len(content)} bytes)")
                     return True
                     
             except Exception as e:
-                print(f"Download error for {url} (attempt {attempt + 1}): {e}")
                 if attempt < max_retries - 1:
                     continue
         
@@ -127,10 +122,9 @@ class ZLibraryDownloader:
                     if "profile" in content.lower() and "login" not in resp.url.path.lower():
                         return True
         except Exception as e:
-            print(f"Session validation error: {e}")
+            pass
         
         # Try to regenerate cookies
-        print("Regenerating cookies...")
         try:
             result = subprocess.run(['python', 'getCookies.py'], capture_output=True, text=True, cwd='.')
             if result.returncode == 0:
@@ -139,7 +133,7 @@ class ZLibraryDownloader:
                 session.cookie_jar.update_cookies(cookies)
                 return True
         except Exception as e:
-            print(f"Cookie regeneration failed: {e}")
+            print(f"❌ Cookie regeneration failed: {e}")
         
         return False
 
@@ -159,13 +153,12 @@ class ZLibraryDownloader:
         # Limit to first n books
         books = all_books[:max_books] if max_books > 0 else all_books
         
-        print(f"Processing {len(books)} out of {len(all_books)} total books")
         os.makedirs(output_dir, exist_ok=True)
         
         # Load cookies and setup session
         cookies = self._load_cookies()
         if not cookies:
-            print("Warning: No cookies found. Authentication may fail.")
+            print("⚠️ No cookies found")
         
         # Get proxy if available (future implementation)
         current_proxy = self.proxy_pool.get_proxy() if self.proxy_pool else None
@@ -180,7 +173,7 @@ class ZLibraryDownloader:
         ) as session:
             # Validate session
             if not await self._validate_and_refresh_session(session):
-                print("Authentication failed. Please check cookies manually.")
+                print("❌ Authentication failed")
                 return
             
             # Download files
@@ -200,7 +193,6 @@ class ZLibraryDownloader:
                     
                     # Skip if file exists
                     if os.path.exists(output_path) and os.path.getsize(output_path) > 1024:
-                        print(f"Already exists: {output_path}")
                         successful_downloads += 1
                         continue
                     
@@ -209,15 +201,15 @@ class ZLibraryDownloader:
                     try:
                         if await self._download_file(session, url, output_path, user_agent):
                             successful_downloads += 1
+                            print(f"✅ Downloaded: {filename}")
                         
                         # Add delay between downloads
                         await asyncio.sleep(random.uniform(1.0, 3.0))
                         
                     except Exception as e:
-                        print(f"Exception during download of {url}: {e}")
                         continue
             
-            print(f"\nDownload Summary: {successful_downloads}/{total_downloads} files downloaded successfully")
+            print(f"📊 Downloaded: {successful_downloads}/{total_downloads} files")
 
 
 # Convenience function for backward compatibility

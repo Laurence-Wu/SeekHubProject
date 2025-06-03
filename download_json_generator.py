@@ -5,100 +5,88 @@ import json
 import asyncio
 
 
-# Generate file names using config variables
-json_file = get_short_output_filename("downloadLinks")
-output_dir = DOWNLOADS_DIR.rstrip('/')  # Remove trailing slash if present
-
-def find_valid_json_file():
-    """Find a valid JSON file with download links"""
-    # List of potential file patterns to check, in order of preference
-    candidates = [
-        get_short_output_filename("downloadLinks"),  # Standard pattern
-        get_output_filename("downloadLinks"),  # Alternative pattern
-    ]
-    
-    # Check for files in the output directory
+def find_all_json_files():
+    """Find all valid JSON files with download links in the json directory"""
+    json_files = []
     json_dir = OUTPUT_DIR
-    if os.path.exists(json_dir):
-        # Add any files ending with '_downloadLinks.json' from the directory
-        dir_files = [f for f in os.listdir(json_dir) if f.endswith('_downloadLinks.json')]
-        for file in dir_files:
-            full_path = os.path.join(json_dir, file)
-            if full_path not in candidates:
-                candidates.append(full_path)
-    # Check each candidate file
-    for candidate in candidates:
-        if os.path.exists(candidate):
-            try:
-                # Verify the file has valid content
-                with open(candidate, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    if isinstance(data, list) and len(data) > 0:
-                        print(f"✅ Found valid JSON file: {candidate}")
-                        return candidate
+    
+    if not os.path.exists(json_dir):
+        print(f"❌ JSON directory does not exist: {json_dir}")
+        return []
+    
+    # Get all JSON files from the directory
+    all_files = [f for f in os.listdir(json_dir) if f.endswith('.json')]
+    
+    for filename in all_files:
+        file_path = os.path.join(json_dir, filename)
+        try:
+            # Verify the file has valid content and download links
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                if isinstance(data, list) and len(data) > 0:
+                    # Check if any book has download links
+                    has_download_links = any(
+                        book.get('download_links') and len(book.get('download_links', [])) > 0
+                        for book in data
+                    )
+                    if has_download_links:
+                        json_files.append(file_path)
+                        print(f"✅ Found valid JSON file: {filename}")
                     else:
-                        print(f"⚠️ File exists but is empty: {candidate}")
-            except (json.JSONDecodeError, IOError) as e:
-                print(f"⚠️ File exists but has issues: {candidate} - {e}")
-    return None
-
-# Check if JSON file exists before proceeding
-json_file = find_valid_json_file()
-
-# Scan output directory to see what files already exist
-print(f"📁 Scanning output directory: {output_dir}")
-if os.path.exists(output_dir):
-    existing_files = [f for f in os.listdir(output_dir) if os.path.isfile(os.path.join(output_dir, f))]
-    print(f"Found {len(existing_files)} existing files in output directory")
-else:
-    print("Output directory does not exist, will be created during download")
-    existing_files = []
-
-# Load JSON file to check how many downloads are expected
-try:
-    with open(json_file, 'r', encoding='utf-8') as f:
-        books_data = json.load(f)
+                        print(f"⚠️ No download links found in: {filename}")
+        except (json.JSONDecodeError, IOError) as e:
+            print(f"⚠️ Invalid JSON file: {filename} - {e}")
     
-    total_expected_downloads = 0
-    for book in books_data:
-        download_links = book.get('download_links', [])
-        total_expected_downloads += len(download_links)
-    
-    print(f"📊 Download Summary:")
-    print(f"  - Expected downloads: {total_expected_downloads}")
-    print(f"  - Existing files: {len(existing_files)}")
-    print(f"  - Potentially remaining: {max(0, total_expected_downloads - len(existing_files))}")
-    
-    
-except Exception as e:
-    print(f"❌ Error reading JSON file: {e}")
-    exit(1)
-
-# First, let's check one of the existing files to see what we actually downloaded
-# Use config variables to construct the expected file path
-book_title = BOOK_NAME_TO_SEARCH.replace(' ', '_').title()
-file_extension = '_'.join(PREFERRED_FILE_TYPES) if PREFERRED_FILE_TYPES else "EPUB"
-existing_file = f"{output_dir}/{book_title}.{file_extension}"
-
-if os.path.exists(existing_file):
-    print(f"✅ Checking existing file: {existing_file}")
-else:
-    print(f"📄 Expected file not found: {existing_file}")
-
-print(f"📂 Using JSON file: {json_file}")
-print(f"📁 Output directory: {output_dir}")
-print(f"🚀 Starting download process...")
-
-asyncio.run(download_books(json_file, output_dir))
+    return json_files
 
 
-# Remove the book file after download completion
-books_json_to_remove = get_short_output_filename()
-if os.path.exists(books_json_to_remove):
+async def process_json_file(json_file, output_dir):
+    """Process a single JSON file and download books"""
     try:
-        os.remove(books_json_to_remove)
-        print(f"🗑️ Removed file: {books_json_to_remove}")
+        with open(json_file, 'r', encoding='utf-8') as f:
+            books_data = json.load(f)
+        
+        total_expected_downloads = sum(
+            len(book.get('download_links', [])) for book in books_data
+        )
+        
+        print(f"📂 Processing: {os.path.basename(json_file)}")
+        print(f"📊 Expected downloads: {total_expected_downloads}")
+        
+        # Download books from this JSON file
+        await download_books(json_file, output_dir)
+        
+        # Remove the JSON file after successful download
+        try:
+            os.remove(json_file)
+            print(f"🗑️ Removed: {os.path.basename(json_file)}")
+        except Exception as e:
+            print(f"❌ Error removing {json_file}: {e}")
+            
     except Exception as e:
-        print(f"❌ Error removing file {books_json_to_remove}: {e}")
-else:
-    print(f"📄 File not found to remove: {books_json_to_remove}")
+        print(f"❌ Error processing {json_file}: {e}")
+
+
+async def main():
+    """Main function to process all JSON files"""
+    output_dir = DOWNLOADS_DIR.rstrip('/')
+    
+    # Find all JSON files with download links
+    json_files = find_all_json_files()
+    
+    if not json_files:
+        print("❌ No valid JSON files found with download links")
+        return
+    
+    print(f"🚀 Found {len(json_files)} JSON files to process")
+    
+    # Process each JSON file
+    for i, json_file in enumerate(json_files, 1):
+        print(f"\n--- Processing file {i}/{len(json_files)} ---")
+        await process_json_file(json_file, output_dir)
+    
+    print(f"\n✅ Completed processing all {len(json_files)} JSON files")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
