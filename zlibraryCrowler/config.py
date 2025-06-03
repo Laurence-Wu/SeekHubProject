@@ -252,7 +252,10 @@ def get_short_output_filename(suffix=""):
     if PREFERRED_LANGUAGE:
         language = PREFERRED_LANGUAGE[:10]
         short_parts.append(language)
-    
+
+    if PREFERRED_YEAR > 0:
+        short_parts.append(str(PREFERRED_YEAR))
+        
     # Always add hash for uniqueness
     short_parts.append(param_hash)
     
