@@ -70,7 +70,7 @@ if login_successful:
         print(f"Successfully extracted data for {len(book_data)} books related to '{book_name_to_search}' from {max_pages_to_scrape} pages.")
         
         # Generate JSON filename with search parameters
-        json_filename = get_output_filename()
+        json_filename = get_short_output_filename()
         
         print(f"Book data saved to: {json_filename}")
         
@@ -93,7 +93,7 @@ if login_successful:
                     async def extract_links_async():
                         return await get_download_links_from_json(
                             json_file_path=json_filename,
-                            output_file_path=None,  # Will auto-generate with '_with_links' suffix
+                            output_file_path=None,  # Will auto-generate with '_downloadLinks' suffix
                             use_selenium=False,
                             driver=driver,
                             wait=wait,
@@ -113,19 +113,18 @@ if login_successful:
                     updated_books = process_books_selenium_fallback(driver, wait, book_data)
                     
                     # Save the updated books with download links
-                    base_name = os.path.splitext(json_filename)[0]
-                    output_filename = f"{base_name}_with_links.json"
+                    output_filename = get_short_output_filename("downloadLinks")
                     
                     with open(output_filename, 'w', encoding='utf-8') as f:
                         json.dump(updated_books, f, ensure_ascii=False, indent=4)
                     
-                    books_with_links = sum(1 for book in updated_books if book.get('download_links'))
+                    books_downloadLinks = sum(1 for book in updated_books if book.get('download_links'))
                     print(f"Saved updated book data with download links to {output_filename}")
-                    print(f"Successfully extracted download links for {books_with_links}/{len(updated_books)} books using Selenium")
+                    print(f"Successfully extracted download links for {books_downloadLinks}/{len(updated_books)} books using Selenium")
                     links_success = True
                 
                 if links_success:
-                    output_file = get_output_filename("with_links")
+                    output_file = get_short_output_filename("downloadLinks")
                     print(f"\n{'='*60}")
                     print("DOWNLOAD LINK EXTRACTION COMPLETED")
                     print(f"{'='*60}")
@@ -136,7 +135,7 @@ if login_successful:
                     print(f"Output file with links: {output_file}")
 
                     # Remove the book file after download completion
-                    books_json_to_remove = f"{OUTPUT_DIR}{BOOK_NAME_TO_SEARCH.replace(' ', '_')}_books.json"
+                    books_json_to_remove = get_short_output_filename()
                     if os.path.exists(books_json_to_remove):
                         try:
                             os.remove(books_json_to_remove)

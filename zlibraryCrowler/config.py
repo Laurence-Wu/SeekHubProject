@@ -1,4 +1,3 @@
-
 import os
 from dotenv import load_dotenv
 
@@ -19,6 +18,8 @@ BOOK_NAME_TO_SEARCH = None
 PREFERRED_LANGUAGE = "chinese"
 PREFERRED_FILE_TYPES = ["EPUB","PDF"]  # Options: ["EPUB", "PDF", "MOBI", "AZW3", "TXT", "FB2", "RTF"] or None for all
 PREFERRED_YEAR = 1800 #set to zero to ignore year
+PREFERRED_CONTENT_TYPES = ["book"]  # Options: ["book", "article"] or None for all
+PREFERRED_ORDER = "bestmatch"  # Options: ["popular", "bestmatch", "newest", "oldest"] - corresponds to popularity, relevance, date desc, date asc
 INCLUDE_FUZZY_MATCHES = False  # Set to False to exclude fuzzy matches
 MAX_PAGES_TO_SCRAPE = 3
 
@@ -77,7 +78,7 @@ DROPDOWN_CLICK_DELAY = 2       # Delay after clicking dropdown (seconds)
 # ADVANCED CONFIGURATION
 # ============================================================================
 # Retry configuration
-MAX_RETRIES = 3                # Maximum number of retries for failed requests
+MAX_RETRIES = 5                # Maximum number of retries for failed requests
 RETRY_DELAY = 5                # Delay between retries (seconds)
 
 # ============================================================================
@@ -100,6 +101,17 @@ DOWNLOAD_URL_PATTERN = '/dl/'
 
 # File format detection patterns
 SUPPORTED_FORMATS = ['epub', 'pdf', 'mobi', 'azw3', 'txt', 'fb2', 'rtf']
+
+# Content type options
+SUPPORTED_CONTENT_TYPES = ['book', 'article']
+
+# Order options mapping to Z-Library parameters
+SUPPORTED_ORDER_OPTIONS = {
+    'popular': 'popular',
+    'bestmatch': 'bestmatch', 
+    'newest': 'newest',
+    'oldest': 'oldest'
+}
 
 # ============================================================================
 # VALIDATION FUNCTIONS
@@ -125,6 +137,16 @@ def validate_config():
         if invalid_types:
             errors.append(f"Invalid file types: {invalid_types}. Supported: {SUPPORTED_FORMATS}")
     
+    # Validate content types
+    if PREFERRED_CONTENT_TYPES:
+        invalid_content_types = [ct for ct in PREFERRED_CONTENT_TYPES if ct.lower() not in SUPPORTED_CONTENT_TYPES]
+        if invalid_content_types:
+            errors.append(f"Invalid content types: {invalid_content_types}. Supported: {SUPPORTED_CONTENT_TYPES}")
+    
+    # Validate order option
+    if PREFERRED_ORDER and PREFERRED_ORDER.lower() not in SUPPORTED_ORDER_OPTIONS:
+        errors.append(f"Invalid order option: {PREFERRED_ORDER}. Supported: {list(SUPPORTED_ORDER_OPTIONS.keys())}")
+    
     # Validate numeric values
     if MAX_PAGES_TO_SCRAPE <= 0:
         errors.append("MAX_PAGES_TO_SCRAPE must be greater than 0")
@@ -138,12 +160,40 @@ def validate_config():
 def get_search_params_string():
     """
     Generate a string representation of search parameters for file naming.
+    Only includes parameters that would actually appear in the URL.
     
     Returns:
         str: Search parameters string
     """
-    file_types_str = '_'.join(PREFERRED_FILE_TYPES) if PREFERRED_FILE_TYPES else 'all'
-    return f"{PROCESS_NAME}_{BOOK_NAME_TO_SEARCH}_{PREFERRED_LANGUAGE}_{file_types_str}"
+    params = [PROCESS_NAME]
+    
+    # Only add book name if it exists and is not None/empty
+    if BOOK_NAME_TO_SEARCH:
+        params.append(BOOK_NAME_TO_SEARCH)
+    
+    # Only add language if it's specified and not default/empty
+    if PREFERRED_LANGUAGE:
+        params.append(PREFERRED_LANGUAGE)
+    
+    # Only add file types if specified (not None or empty list)
+    if PREFERRED_FILE_TYPES:
+        file_types_str = '_'.join(PREFERRED_FILE_TYPES)
+        params.append(file_types_str)
+    
+    # Only add content types if specified and not default
+    if PREFERRED_CONTENT_TYPES:
+        content_types_str = '_'.join(PREFERRED_CONTENT_TYPES)
+        params.append(content_types_str)
+    
+    # Only add order if specified and not default
+    if PREFERRED_ORDER:
+        params.append(PREFERRED_ORDER)
+    
+    # Only add year if specified and greater than 0
+    if PREFERRED_YEAR and PREFERRED_YEAR > 0:
+        params.append(str(PREFERRED_YEAR))
+    
+    return '_'.join(params)
 
 def get_output_filename(suffix=""):
     """
@@ -155,11 +205,63 @@ def get_output_filename(suffix=""):
     Returns:
         str: Complete output filename
     """
-    base_name = get_search_params_string().replace(' ', '_')
+    # Get base name and clean it for filename use
+    base_name = get_search_params_string().replace(' ', '_').replace('/', '_').replace('\\', '_')
+    
+    # Remove any problematic characters for filenames
+    import re
+    base_name = re.sub(r'[<>:"|?*]', '_', base_name)
+    
+    # Ensure the base name isn't too long (max 200 chars before extension)
+    if len(base_name) > 200:
+        base_name = base_name[:200]
+    
     if suffix:
         return f"{OUTPUT_DIR}{base_name}_{suffix}.json"
     else:
         return f"{OUTPUT_DIR}{base_name}_books.json"
+
+def get_short_output_filename(suffix=""):
+    """
+    Generate a shorter output filename for cases where full parameter string is too long.
+    
+    Args:
+        suffix (str): Optional suffix to add to filename
+        
+    Returns:
+        str: Complete output filename with shortened parameters
+    """
+    import hashlib
+    
+    # Create a hash of the full search parameters for uniqueness
+    full_params = get_search_params_string()
+    param_hash = hashlib.md5(full_params.encode()).hexdigest()[:8]
+    
+    # Build short name with only essential non-empty parameters
+    short_parts = [PROCESS_NAME]
+    
+    # Add book name if exists (truncated)
+    if BOOK_NAME_TO_SEARCH:
+        book_name = BOOK_NAME_TO_SEARCH[:30]
+        # Clean the book name for filename use
+        import re
+        book_name = re.sub(r'[<>:"|?*/\\]', '_', book_name)
+        short_parts.append(book_name)
+    
+    # Add language if exists (truncated)
+    if PREFERRED_LANGUAGE:
+        language = PREFERRED_LANGUAGE[:10]
+        short_parts.append(language)
+    
+    # Always add hash for uniqueness
+    short_parts.append(param_hash)
+    
+    short_name = '_'.join(short_parts)
+    
+    if suffix:
+        return f"{OUTPUT_DIR}{short_name}_{suffix}.json"
+    else:
+        return f"{OUTPUT_DIR}{short_name}_books.json"
 
 def get_download_filename(original_filename):
     """
@@ -202,6 +304,24 @@ def create_output_directories():
         print(f"Error creating output directories: {e}")
         return False
 
+def get_zlibrary_order_param():
+    """
+    Get the Z-Library order parameter value based on PREFERRED_ORDER.
+    
+    Returns:
+        str: Z-Library order parameter value
+    """
+    return SUPPORTED_ORDER_OPTIONS.get(PREFERRED_ORDER.lower(), 'popular') if PREFERRED_ORDER else 'popular'
+
+def get_content_types_param():
+    """
+    Get content types parameter for Z-Library URL formatting.
+    
+    Returns:
+        list: List of content types for URL parameters
+    """
+    return PREFERRED_CONTENT_TYPES if PREFERRED_CONTENT_TYPES else ['book', 'article']
+
 # ============================================================================
 # CONFIGURATION SUMMARY
 # ============================================================================
@@ -213,6 +333,9 @@ def print_config_summary():
     print(f"Search Query: {BOOK_NAME_TO_SEARCH}")
     print(f"Language: {PREFERRED_LANGUAGE}")
     print(f"File Types: {PREFERRED_FILE_TYPES if PREFERRED_FILE_TYPES else 'All'}")
+    print(f"Content Types: {PREFERRED_CONTENT_TYPES if PREFERRED_CONTENT_TYPES else 'All'}")
+    print(f"Order: {PREFERRED_ORDER}")
+    print(f"Preferred Year: {PREFERRED_YEAR if PREFERRED_YEAR > 0 else 'Any'}")
     print(f"Max Pages: {MAX_PAGES_TO_SCRAPE}")
     print(f"Fuzzy Matches: {'Included' if INCLUDE_FUZZY_MATCHES else 'Excluded'}")
     print(f"Download Links: {'Enabled' if EXTRACT_DOWNLOAD_LINKS else 'Disabled'}")

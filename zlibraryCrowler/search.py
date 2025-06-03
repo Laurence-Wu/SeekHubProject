@@ -4,7 +4,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
-from .config import ZLIBRARY_BASE_URL,OUTPUT_DIR,PREFERRED_YEAR,MAX_PAGES_TO_SCRAPE
+from .config import ZLIBRARY_BASE_URL,OUTPUT_DIR,PREFERRED_YEAR,MAX_PAGES_TO_SCRAPE,get_short_output_filename
 
 def search_and_extract_books(driver, wait, search_url, book_name_for_file, max_pages=1, preferred_file_types=None, include_fuzzy_matches=True):
     """
@@ -133,9 +133,7 @@ def search_and_extract_books(driver, wait, search_url, book_name_for_file, max_p
                                 print(f"Preferred types: {preferred_file_types}, Found: {current_file_type}")
                                 # Save what we have so far before terminating
                                 if book_data:
-                                    if book_name_for_file is None:
-                                        book_name_for_file = PREFERRED_YEAR
-                                    output_filename = f"{OUTPUT_DIR}{book_name_for_file.replace(' ', '_')}_books.json"
+                                    output_filename = get_short_output_filename()
                                     print(f"PSrogram ends with {len(book_data)} books found before termination.")
                                     with open(output_filename, 'w', encoding='utf-8') as f:
                                         json.dump(book_data, f, ensure_ascii=False, indent=4)
@@ -176,13 +174,7 @@ def search_and_extract_books(driver, wait, search_url, book_name_for_file, max_p
 
         
         # Save the book data to a JSON file
-        
-        if book_name_for_file is None:
-            book_name_for_file = f"{PREFERRED_YEAR}_{MAX_PAGES_TO_SCRAPE}" 
-        else:
-            book_name_for_file = book_name_for_file.replace(' ', '_')
-
-        output_filename = f"{OUTPUT_DIR}{book_name_for_file}_books.json"
+        output_filename = get_short_output_filename()
         with open(output_filename, 'w', encoding='utf-8') as f:
             json.dump(book_data, f, ensure_ascii=False, indent=4)
             
