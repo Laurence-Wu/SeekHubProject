@@ -11,7 +11,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
 import os
 from typing import List, Dict, Optional
-from .config import ZLIBRARY_BASE_URL, USE_ASYNC_EXTRACTION, MAX_CONCURRENT_REQUESTS, OUTPUT_DIR, get_short_output_filename
+from .config import ZLIBRARY_BASE_URL, USE_ASYNC_EXTRACTION, MAX_CONCURRENT_REQUESTS, get_output_filename
 
 # Import cookie management functions
 from .getCookies import get_cookies_from_selenium
@@ -390,7 +390,7 @@ async def get_download_links_from_json(json_file_path: str, output_file_path: st
     
     Args:
         json_file_path: Path to the JSON file containing book data
-        output_file_path: Path for the output file (defaults to input file with '_downloadLinks' suffix)
+        output_file_path: Path for the output file (defaults to input file with '__downloadLinks' suffix)
         use_selenium: Whether to use Selenium for processing
         driver: Selenium WebDriver instance (required if use_selenium=True)
         wait: WebDriverWait instance (required if use_selenium=True)
@@ -441,7 +441,10 @@ async def get_download_links_from_json(json_file_path: str, output_file_path: st
         
         # Determine output file path
         if not output_file_path:
-            output_file_path = get_short_output_filename("downloadLinks")
+            # Extract just the filename without directory path for base_name
+            input_filename = os.path.basename(json_file_path)
+            base_name = os.path.splitext(input_filename)[0]
+            output_file_path = get_output_filename(f"{base_name}__downloadLinks").replace("_books.json", ".json")
         
         # Ensure output directory exists
         os.makedirs(os.path.dirname(output_file_path), exist_ok=True)
@@ -456,8 +459,8 @@ async def get_download_links_from_json(json_file_path: str, output_file_path: st
             return False
         
         # Print summary
-        books_downloadLinks = sum(1 for book in updated_books if book.get('download_links'))
-        print(f"Successfully extracted download links for {books_downloadLinks}/{len(updated_books)} books")
+        books__downloadLinks = sum(1 for book in updated_books if book.get('download_links'))
+        print(f"Successfully extracted download links for {books__downloadLinks}/{len(updated_books)} books")
         
         return True
         
@@ -533,7 +536,9 @@ def process_existing_json_with_download_links(driver, wait, json_file_path):
         updated_books = process_books_selenium_fallback(driver, wait, books)
         
         # Save updated books
-        output_filename = get_short_output_filename("downloadLinks")
+        input_filename = os.path.basename(json_file_path)
+        base_name = os.path.splitext(input_filename)[0]
+        output_filename = get_output_filename(f"{base_name}__downloadLinks").replace("_books.json", ".json")
         
         # Ensure output directory exists
         os.makedirs(os.path.dirname(output_filename), exist_ok=True)
@@ -542,9 +547,9 @@ def process_existing_json_with_download_links(driver, wait, json_file_path):
             with open(output_filename, 'w', encoding='utf-8') as f:
                 json.dump(updated_books, f, ensure_ascii=False, indent=4)
             
-            books_downloadLinks = sum(1 for book in updated_books if book.get('download_links'))
+            books__downloadLinks = sum(1 for book in updated_books if book.get('download_links'))
             print(f"Saved updated book data to {output_filename}")
-            print(f"Successfully extracted download links for {books_downloadLinks}/{len(updated_books)} books")
+            print(f"Successfully extracted download links for {books__downloadLinks}/{len(updated_books)} books")
         except IOError as e:
             print(f"Error saving output file {output_filename}: {e}")
             return False

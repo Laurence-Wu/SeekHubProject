@@ -1,10 +1,11 @@
 import json
+import os
 import time
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
-from .config import ZLIBRARY_BASE_URL,OUTPUT_DIR,PREFERRED_YEAR,MAX_PAGES_TO_SCRAPE,get_short_output_filename
+from .config import ZLIBRARY_BASE_URL,PREFERRED_YEAR,MAX_PAGES_TO_SCRAPE,get_short_output_filename
 
 def search_and_extract_books(driver, wait, search_url, book_name_for_file, max_pages=1, preferred_file_types=None, include_fuzzy_matches=True):
     """
@@ -134,9 +135,10 @@ def search_and_extract_books(driver, wait, search_url, book_name_for_file, max_p
                                 # Save what we have so far before terminating
                                 if book_data:
                                     output_filename = get_short_output_filename()
-                                    print(f"PSrogram ends with {len(book_data)} books found before termination.")
+                                    os.makedirs(os.path.dirname(output_filename), exist_ok=True)
                                     with open(output_filename, 'w', encoding='utf-8') as f:
                                         json.dump(book_data, f, ensure_ascii=False, indent=4)
+                                    print(f"Program ends with {len(book_data)} books found before termination.")
                                     print(f"\nSaved information for {len(book_data)} books to {output_filename} before termination")
                                 return True, book_data
                         
@@ -175,9 +177,9 @@ def search_and_extract_books(driver, wait, search_url, book_name_for_file, max_p
         
         # Save the book data to a JSON file
         output_filename = get_short_output_filename()
+        os.makedirs(os.path.dirname(output_filename), exist_ok=True)
         with open(output_filename, 'w', encoding='utf-8') as f:
             json.dump(book_data, f, ensure_ascii=False, indent=4)
-            
         print(f"\nSaved information for {len(book_data)} books to {output_filename}")
         return True, book_data
         

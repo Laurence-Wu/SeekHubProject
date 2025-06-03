@@ -344,8 +344,72 @@ def print_config_summary():
     print(f"Headless Browser: {'Yes' if USE_HEADLESS_BROWSER else 'No'}")
     print("="*60)
 
+def update_preferred_year(new_year):
+    import re
+    try:
+        with open(__file__, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        pattern = r'^PREFERRED_YEAR\s*=\s*\d+.*$'
+        replacement = f'PREFERRED_YEAR = {new_year} #set to zero to ignore year'
+        new_content = re.sub(pattern, replacement, content, flags=re.MULTILINE)
+        
+        if new_content == content:
+            return False
+        
+        with open(__file__, 'w', encoding='utf-8') as f:
+            f.write(new_content)
+        
+        global PREFERRED_YEAR
+        PREFERRED_YEAR = new_year
+        return True
+    except Exception:
+        return False
 
+def update_preferred_language(new_language):
+    import re
+    try:
+        with open(__file__, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        pattern = r'^PREFERRED_LANGUAGE\s*=\s*["\'].*["\'].*$'
+        replacement = f'PREFERRED_LANGUAGE = "{new_language}"'
+        new_content = re.sub(pattern, replacement, content, flags=re.MULTILINE)
+        
+        if new_content == content:
+            return False
+        
+        with open(__file__, 'w', encoding='utf-8') as f:
+            f.write(new_content)
+        
+        global PREFERRED_LANGUAGE
+        PREFERRED_LANGUAGE = new_language
+        return True
+    except Exception:
+        return False
 
+def update_book_search_name(new_book_name):
+    import re
+    try:
+        with open(__file__, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        pattern = r'^BOOK_NAME_TO_SEARCH\s*=\s*.*$'
+        replacement = 'BOOK_NAME_TO_SEARCH = None' if new_book_name is None else f'BOOK_NAME_TO_SEARCH = "{new_book_name}"'
+        new_content = re.sub(pattern, replacement, content, flags=re.MULTILINE)
+        
+        if new_content == content:
+            return False
+        
+        with open(__file__, 'w', encoding='utf-8') as f:
+            f.write(new_content)
+        
+        global BOOK_NAME_TO_SEARCH
+        BOOK_NAME_TO_SEARCH = new_book_name
+        return True
+    except Exception:
+        return False
+    
     # ============================================================================
     # DIRECTORY INITIALIZATION
     # ============================================================================
