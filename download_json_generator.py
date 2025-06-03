@@ -31,9 +31,9 @@ def find_all_json_files():
                     )
                     if has_download_links:
                         json_files.append(file_path)
-                        print(f"✅ Found valid JSON file: {filename}")
+                        print(f"✅ Found valid JSON file with download links: {filename}")
                     else:
-                        print(f"⚠️ No download links found in: {filename}")
+                        print(f"⚠️ No download links found in: {filename} (skipping)")
         except (json.JSONDecodeError, IOError) as e:
             print(f"⚠️ Invalid JSON file: {filename} - {e}")
     

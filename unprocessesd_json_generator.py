@@ -134,16 +134,16 @@ if login_successful:
                     print(f"Total books found: {len(book_data)}")
                     print(f"Output file with links: {output_file}")
 
-                    # Remove the book file after download completion
-                    books_json_to_remove = get_short_output_filename()
+                    # Remove the original books file (without download links) after successful link extraction
+                    books_json_to_remove = json_filename  # Use the original filename that was saved
                     if os.path.exists(books_json_to_remove):
                         try:
                             os.remove(books_json_to_remove)
-                            print(f"🗑️ Removed file: {books_json_to_remove}")
+                            print(f"🗑️ Removed original books file: {os.path.basename(books_json_to_remove)}")
                         except Exception as e:
                             print(f"❌ Error removing file {books_json_to_remove}: {e}")
                     else:
-                        print(f"📄 File not found to remove: {books_json_to_remove}")
+                        print(f"📄 Original books file not found to remove: {os.path.basename(books_json_to_remove)}")
                     print(f"{'='*60}")
                 else:
                     print("❌ Download link extraction failed!")

@@ -6,7 +6,7 @@ import aiofiles
 import pickle
 import random
 import subprocess
-from .config import ZLIBRARY_BASE_URL
+from .config import ZLIBRARY_BASE_URL, DOWNLOADS_DIR, get_download_filename
 
 
 class ZLibraryDownloader:
@@ -188,8 +188,9 @@ class ZLibraryDownloader:
                         continue
                     
                     total_downloads += 1
-                    filename = self.sanitize_filename(f"{title}.{ext}")
-                    output_path = os.path.join(output_dir, filename)
+                    # Use proper filename generation from config
+                    base_filename = f"{self.sanitize_filename(title)}.{ext}"
+                    output_path = get_download_filename(base_filename)
                     
                     # Skip if file exists
                     if os.path.exists(output_path) and os.path.getsize(output_path) > 1024:
@@ -201,7 +202,7 @@ class ZLibraryDownloader:
                     try:
                         if await self._download_file(session, url, output_path, user_agent):
                             successful_downloads += 1
-                            print(f"✅ Downloaded: {filename}")
+                            print(f"✅ Downloaded: {os.path.basename(output_path)}")
                         
                         # Add delay between downloads
                         await asyncio.sleep(random.uniform(1.0, 3.0))
