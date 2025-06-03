@@ -144,11 +144,22 @@ class ZLibraryDownloader:
         return False
 
     
-    async def download_books(self, json_file, output_dir):
-        """Main download function with simplified architecture."""
+    async def download_books(self, json_file, output_dir, max_books=1):
+        """Main download function with simplified architecture.
+        
+        Args:
+            json_file (str): Path to JSON file containing book data
+            output_dir (str): Directory to save downloaded files
+            max_books (int): Maximum number of books to download (default: 1)
+        """
         # Load book data
         with open(json_file, 'r', encoding='utf-8') as f:
-            books = json.load(f)
+            all_books = json.load(f)
+        
+        # Limit to first n books
+        books = all_books[:max_books] if max_books > 0 else all_books
+        
+        print(f"Processing {len(books)} out of {len(all_books)} total books")
         os.makedirs(output_dir, exist_ok=True)
         
         # Load cookies and setup session
@@ -210,8 +221,14 @@ class ZLibraryDownloader:
 
 
 # Convenience function for backward compatibility
-async def download_books(json_file, output_dir):
-    """Backward compatibility wrapper."""
+async def download_books(json_file, output_dir, max_books=1):
+    """Backward compatibility wrapper.
+    
+    Args:
+        json_file (str): Path to JSON file containing book data
+        output_dir (str): Directory to save downloaded files
+        max_books (int): Maximum number of books to download (default: 1)
+    """
     downloader = ZLibraryDownloader()
-    await downloader.download_books(json_file, output_dir)
+    await downloader.download_books(json_file, output_dir, max_books)
 
