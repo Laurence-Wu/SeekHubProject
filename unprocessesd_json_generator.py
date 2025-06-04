@@ -69,7 +69,10 @@ if login_successful:
         book_name_to_search, 
         max_pages_to_scrape, 
         preferred_file_types,
-        include_fuzzy_matches
+        include_fuzzy_matches,
+        cookies_file=COOKIES_FILE,
+        email=EMAIL,
+        password=PASSWORD
     )
     
     if search_success:

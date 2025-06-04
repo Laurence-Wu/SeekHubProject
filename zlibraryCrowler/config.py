@@ -11,6 +11,13 @@ EMAIL = os.getenv('EMAIL')
 PASSWORD = os.getenv('PASSWORD')
 COOKIES_FILE = 'zlibrary_cookies.pkl'
 
+# Enhanced login configuration
+LOGIN_TIMEOUT = 15             # Timeout for login operations (seconds)
+LOGIN_MAX_RETRIES = 3          # Maximum login retry attempts
+LOGIN_RETRY_DELAY = 3          # Delay between login retries (seconds)
+COOKIE_MAX_AGE_HOURS = 24      # Maximum age for cookies before forced refresh
+SESSION_CHECK_INTERVAL = 10    # Interval to check session validity during operations
+
 # ============================================================================
 # SEARCH CONFIGURATION
 # ============================================================================
@@ -20,8 +27,8 @@ PREFERRED_FILE_TYPES = ["EPUB","PDF"]  # Options: ["EPUB", "PDF", "MOBI", "AZW3"
 PREFERRED_YEAR = 2002 #set to zero to ignore year
 PREFERRED_CONTENT_TYPES = ["book"]  # Options: ["book", "article"] or None for all
 PREFERRED_ORDER = "bestmatch"  # Options: ["popular", "bestmatch", "newest", "oldest"] - corresponds to popularity, relevance, date desc, date asc
-INCLUDE_FUZZY_MATCHES = False  # Set to False to exclude fuzzy matches
-MAX_PAGES_TO_SCRAPE = 3
+INCLUDE_FUZZY_MATCHES = True  # Set to False to exclude fuzzy matches
+MAX_PAGES_TO_SCRAPE = 3000
 
 # Z-Library website base URL
 ZLIBRARY_BASE_URL = "https://zh.z-lib.fm"
@@ -37,7 +44,7 @@ MAX_CONCURRENT_REQUESTS = 3    # Reduce if you get rate limited
 # BROWSER CONFIGURATION
 # ============================================================================
 USE_HEADLESS_BROWSER = True    # Set to False to see browser window
-BROWSER_TIMEOUT = 10           # Timeout for WebDriverWait
+BROWSER_TIMEOUT = 100           # Timeout for WebDriverWait
 BROWSER_SLEEP_TIME = 2         # Sleep time before closing browser
 
 # Browser options
