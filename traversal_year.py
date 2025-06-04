@@ -23,11 +23,21 @@ def run_unprocessed_json_generator():
         # Get the path to the unprocessed JSON generator
         script_path = os.path.join(os.path.dirname(__file__), 'unprocessesd_json_generator.py')
         
-        # Run the script using Python
+        # Set up environment to include current directory in Python path
+        env = os.environ.copy()
+        current_dir = os.path.dirname(__file__)
+        if 'PYTHONPATH' in env:
+            env['PYTHONPATH'] = f"{current_dir}{os.pathsep}{env['PYTHONPATH']}"
+        else:
+            env['PYTHONPATH'] = current_dir
+        
+        # Run the script using Python with proper environment
         result = subprocess.run([sys.executable, script_path], 
                               capture_output=True, 
                               text=True, 
-                              timeout=300)  # 5 minute timeout
+                              timeout=300,  # 5 minute timeout
+                              env=env,      # Pass the modified environment
+                              cwd=current_dir)  # Set working directory
         
         # Print output for debugging
         if result.stdout:
