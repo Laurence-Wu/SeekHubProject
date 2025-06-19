@@ -35,7 +35,7 @@ def run_unprocessed_json_generator():
         result = subprocess.run([sys.executable, script_path], 
                               capture_output=True, 
                               text=True, 
-                              timeout=300,  # 5 minute timeout
+                              timeout=1500,  # 5 minute timeout
                               env=env,      # Pass the modified environment
                               cwd=current_dir)  # Set working directory
         
