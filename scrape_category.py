@@ -45,6 +45,10 @@ CATEGORIES_URL = "https://zh.z-lib.fm/categories"
 SKIP_FULLY_PROCESSED_CATEGORIES = True  # Set to False to re-process all categories
 SHOW_DETAILED_CATEGORY_STATUS = True    # Set to False to reduce log verbosity
 
+
+START_YEAR = 1990
+END_YEAR = 2025
+
 def extract_categories(driver, wait):
     """
     Extract all categories from the Z-Library categories page.
@@ -128,7 +132,7 @@ def extract_categories(driver, wait):
         return categories
 
 
-def run_year_traversal_for_category(category_info, start_year=2000, end_year=2025):
+def run_year_traversal_for_category(category_info, start_year=START_YEAR, end_year=2025):
     """
     Run year traversal for a specific category by updating the book search name
     and running the traversal script.
@@ -341,7 +345,7 @@ def save_categories_info(categories, output_dir=None):
         return None
 
 
-def check_category_already_processed(category_name, start_year=2000, end_year=2025):
+def check_category_already_processed(category_name, start_year=START_YEAR, end_year=2025):
     """
     Check if a category has already been processed by looking for existing JSON files
     in the output/json folder.
@@ -444,7 +448,7 @@ def check_category_already_processed(category_name, start_year=2000, end_year=20
         }
 
 
-def analyze_all_categories_status(categories, start_year=2000, end_year=2025):
+def analyze_all_categories_status(categories, start_year=START_YEAR, end_year=2025):
     """
     Analyze the processing status of all categories and provide a summary.
     
@@ -679,7 +683,7 @@ def main():
         print(f"{'='*80}")
         
         # Analyze overall status of all categories
-        analyze_all_categories_status(categories, start_year=2000, end_year=2025)
+        analyze_all_categories_status(categories, start_year=START_YEAR, end_year=2025)
         
         return len(failed_categories) == 0
         
