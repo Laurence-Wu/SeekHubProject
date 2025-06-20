@@ -132,7 +132,7 @@ def extract_categories(driver, wait):
         return categories
 
 
-def run_year_traversal_for_category(category_info, start_year=START_YEAR, end_year=2025):
+def run_year_traversal_for_category(category_info, start_year=START_YEAR, end_year=END_YEAR):
     """
     Run year traversal for a specific category by updating the book search name
     and running the traversal script.
@@ -345,7 +345,7 @@ def save_categories_info(categories, output_dir=None):
         return None
 
 
-def check_category_already_processed(category_name, start_year=START_YEAR, end_year=2025):
+def check_category_already_processed(category_name, start_year=START_YEAR, end_year=END_YEAR):
     """
     Check if a category has already been processed by looking for existing JSON files
     in the output/json folder.
@@ -394,14 +394,54 @@ def check_category_already_processed(category_name, start_year=START_YEAR, end_y
         
         for file in json_files:
             # Check if the file contains the category name
-            # The filename pattern is: zlibrary_crawler_{category_name}_{language}_{year}_{hash}_books.json
-            if clean_category_name.lower() in file.lower() and '_books.json' in file:
+            # Pattern variations:
+            # 1. zlibrary_crawler_{category_name}_{language}_{year}_{hash}_books.json
+            # 2. zlibrary_crawler_{category_name}_{language}_EPUB_PDF_book_bestmatch_{year}_zlibrary_crawler_{category_name}_{language}_{year}_{hash}_books__downloadLinks.json
+            
+            # More precise matching to avoid false positives
+            category_matches = False
+            
+            # Clean both the category name and filename for comparison
+            clean_file = file.lower()
+            clean_category_lower = clean_category_name.lower()
+            original_category_lower = category_name.lower()
+            
+            # Check if it's a relevant file type first
+            if '_books.json' in file or '__downloadLinks.json' in file:
+                # Try different matching strategies
+                
+                # Strategy 1: Match at the beginning after "zlibrary_crawler_"
+                if clean_file.startswith(f'zlibrary_crawler_{clean_category_lower}_'):
+                    category_matches = True
+                elif clean_file.startswith(f'zlibrary_crawler_{original_category_lower}_'):
+                    category_matches = True
+                # Strategy 2: For categories with spaces, try with underscores
+                elif ' ' in category_name:
+                    category_with_underscores = category_name.replace(' ', '_').lower()
+                    if clean_file.startswith(f'zlibrary_crawler_{category_with_underscores}_'):
+                        category_matches = True
+                
+                # Strategy 3: For downloadLinks files, check the second occurrence of category name
+                if '__downloadlinks.json' in clean_file:
+                    # Pattern: ..._{year}_zlibrary_crawler_{category_name}_{language}_{year}_{hash}_books__downloadLinks.json
+                    if f'_zlibrary_crawler_{clean_category_lower}_' in clean_file:
+                        category_matches = True
+                    elif f'_zlibrary_crawler_{original_category_lower}_' in clean_file:
+                        category_matches = True
+                    elif ' ' in category_name:
+                        # Handle spaces in category names in downloadLinks files
+                        if f'_zlibrary_crawler_{original_category_lower}_' in clean_file:
+                            category_matches = True
+            
+            if category_matches:
                 existing_files.append(file)
                 
-                # Try to extract year from filename
+                # Try to extract year from filename - look for all 4-digit patterns
                 try:
-                    # Look for year pattern (4 digits) in the filename
                     year_matches = re.findall(r'_(\d{4})_', file)
+                    # Also try pattern at the end before hash
+                    year_matches.extend(re.findall(r'(\d{4})_[a-f0-9]{8}_books', file))
+                    
                     for year_str in year_matches:
                         year = int(year_str)
                         if start_year <= year <= end_year:
@@ -448,7 +488,7 @@ def check_category_already_processed(category_name, start_year=START_YEAR, end_y
         }
 
 
-def analyze_all_categories_status(categories, start_year=START_YEAR, end_year=2025):
+def analyze_all_categories_status(categories, start_year=START_YEAR, end_year=END_YEAR):
     """
     Analyze the processing status of all categories and provide a summary.
     
@@ -683,7 +723,7 @@ def main():
         print(f"{'='*80}")
         
         # Analyze overall status of all categories
-        analyze_all_categories_status(categories, start_year=START_YEAR, end_year=2025)
+        analyze_all_categories_status(categories, start_year=START_YEAR, end_year=END_YEAR)
         
         return len(failed_categories) == 0
         
