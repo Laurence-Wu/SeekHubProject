@@ -21,10 +21,10 @@ SESSION_CHECK_INTERVAL = 10    # Interval to check session validity during opera
 # ============================================================================
 # SEARCH CONFIGURATION
 # ============================================================================
-BOOK_NAME_TO_SEARCH = None
+BOOK_NAME_TO_SEARCH = "Business of Art"
 PREFERRED_LANGUAGE = "chinese"
 PREFERRED_FILE_TYPES = ["EPUB","PDF"]  # Options: ["EPUB", "PDF", "MOBI", "AZW3", "TXT", "FB2", "RTF"] or None for all
-PREFERRED_YEAR = 1959 #set to zero to ignore year
+PREFERRED_YEAR = 2002 #set to zero to ignore year
 PREFERRED_CONTENT_TYPES = ["book"]  # Options: ["book", "article"] or None for all
 PREFERRED_ORDER = "bestmatch"  # Options: ["popular", "bestmatch", "newest", "oldest"] - corresponds to popularity, relevance, date desc, date asc
 INCLUDE_FUZZY_MATCHES = True  # Set to False to exclude fuzzy matches

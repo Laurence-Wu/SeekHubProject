@@ -41,6 +41,10 @@ logger = logging.getLogger(__name__)
 # Categories page URL
 CATEGORIES_URL = "https://zh.z-lib.fm/categories"
 
+# Configuration for category processing behavior
+SKIP_FULLY_PROCESSED_CATEGORIES = True  # Set to False to re-process all categories
+SHOW_DETAILED_CATEGORY_STATUS = True    # Set to False to reduce log verbosity
+
 def extract_categories(driver, wait):
     """
     Extract all categories from the Z-Library categories page.
@@ -141,6 +145,25 @@ def run_year_traversal_for_category(category_info, start_year=2000, end_year=202
         category_name = category_info['name']
         logger.info(f"Starting year traversal for category: {category_name}")
         
+        # Check if category has already been processed
+        logger.info(f"Checking if category '{category_name}' has already been processed...")
+        processing_status = check_category_already_processed(category_name, start_year, end_year)
+        
+        if processing_status['fully_processed']:
+            logger.info(f"✅ Category '{category_name}' has already been fully processed!")
+            logger.info(f"   Found {len(processing_status['existing_files'])} existing files")
+            logger.info(f"   All years ({start_year}-{end_year}) have been processed")
+            return True
+        
+        # If partially processed, only process missing years
+        years_to_process = processing_status['missing_years']
+        if len(years_to_process) < (end_year - start_year + 1):
+            logger.info(f"📋 Category '{category_name}' is partially processed")
+            logger.info(f"   Already processed years: {processing_status['processed_years']}")
+            logger.info(f"   Will process {len(years_to_process)} missing years: {years_to_process}")
+        else:
+            logger.info(f"🆕 Category '{category_name}' is new - will process all {len(years_to_process)} years")
+        
         # Update the book search name to the category name
         logger.info(f"Updating book search name to: {category_name}")
         if not update_book_search_name(category_name):
@@ -155,11 +178,15 @@ def run_year_traversal_for_category(category_info, start_year=2000, end_year=202
         failed_years = []
         total_start_time = time.time()
         
-        logger.info(f"Starting year traversal from {start_year} to {end_year} for category: {category_name}")
+        if years_to_process:
+            logger.info(f"Starting year traversal for {len(years_to_process)} years: {years_to_process} for category: {category_name}")
+        else:
+            logger.info(f"No years to process for category: {category_name}")
+            return True
         
-        # Loop through specified years
-        for year in range(start_year, end_year + 1):
-            logger.info(f"Processing year {year} for category: {category_name}")
+        # Loop through only the missing years
+        for year in years_to_process:
+            logger.info(f"Processing year {year} for category: {category_name} ({years_to_process.index(year) + 1}/{len(years_to_process)})")
             
             year_start_time = time.time()
             
@@ -205,15 +232,29 @@ def run_year_traversal_for_category(category_info, start_year=2000, end_year=202
         total_end_time = time.time()
         total_duration = total_end_time - total_start_time
         
+        # Calculate comprehensive statistics
+        total_years_range = end_year - start_year + 1
+        skipped_years = len(processing_status['processed_years'])
+        processed_now = len(successful_years)
+        failed_now = len(failed_years)
+        
         logger.info(f"Category '{category_name}' traversal completed")
-        logger.info(f"Successful years: {len(successful_years)}, Failed years: {len(failed_years)}")
-        logger.info(f"Total processing time: {total_duration:.2f} seconds ({total_duration/60:.1f} minutes)")
+        logger.info(f"📊 PROCESSING SUMMARY:")
+        logger.info(f"   • Total year range: {start_year}-{end_year} ({total_years_range} years)")
+        logger.info(f"   • Previously processed: {skipped_years} years")
+        logger.info(f"   • Processed now: {processed_now} years")
+        logger.info(f"   • Failed now: {failed_now} years")
+        logger.info(f"   • Total coverage: {skipped_years + processed_now}/{total_years_range} years ({((skipped_years + processed_now)/total_years_range)*100:.1f}%)")
+        logger.info(f"   • Processing time: {total_duration:.2f} seconds ({total_duration/60:.1f} minutes)")
+        
+        if processing_status['processed_years']:
+            logger.info(f"📋 Previously processed years: {processing_status['processed_years']}")
         
         if successful_years:
-            logger.info(f"Successful years for {category_name}: {successful_years}")
+            logger.info(f"✅ Successfully processed years: {successful_years}")
         
         if failed_years:
-            logger.info(f"Failed years for {category_name}: {failed_years}")
+            logger.info(f"❌ Failed years: {failed_years}")
         
         return len(failed_years) == 0  # Return True if no failures
         
@@ -300,6 +341,212 @@ def save_categories_info(categories, output_dir=None):
         return None
 
 
+def check_category_already_processed(category_name, start_year=2000, end_year=2025):
+    """
+    Check if a category has already been processed by looking for existing JSON files
+    in the output/json folder.
+    
+    Args:
+        category_name (str): Name of the category to check
+        start_year (int): Starting year to check
+        end_year (int): Ending year to check
+    
+    Returns:
+        dict: Dictionary with processing status information
+            - 'fully_processed': bool - True if all years are processed
+            - 'processed_years': list - Years that have been processed
+            - 'missing_years': list - Years that haven't been processed
+            - 'existing_files': list - List of existing JSON files for this category
+    """
+    try:
+        json_dir = OUTPUT_FOLDERS['json']
+        
+        # Ensure the path is absolute
+        if not os.path.isabs(json_dir):
+            json_dir = os.path.join(os.path.dirname(__file__), json_dir)
+        
+        # Create directory if it doesn't exist
+        os.makedirs(json_dir, exist_ok=True)
+        
+        # Get all JSON files in the directory
+        if not os.path.exists(json_dir):
+            logger.warning(f"JSON directory does not exist: {json_dir}")
+            return {
+                'fully_processed': False,
+                'processed_years': [],
+                'missing_years': list(range(start_year, end_year + 1)),
+                'existing_files': []
+            }
+        
+        json_files = [f for f in os.listdir(json_dir) if f.endswith('.json')]
+        
+        # Clean category name for filename matching (same as in config.py)
+        import re
+        clean_category_name = re.sub(r'[<>:"|?*/\\]', '_', category_name)
+        
+        # Find files that match this category
+        existing_files = []
+        processed_years = []
+        
+        for file in json_files:
+            # Check if the file contains the category name
+            # The filename pattern is: zlibrary_crawler_{category_name}_{language}_{year}_{hash}_books.json
+            if clean_category_name.lower() in file.lower() and '_books.json' in file:
+                existing_files.append(file)
+                
+                # Try to extract year from filename
+                try:
+                    # Look for year pattern (4 digits) in the filename
+                    year_matches = re.findall(r'_(\d{4})_', file)
+                    for year_str in year_matches:
+                        year = int(year_str)
+                        if start_year <= year <= end_year:
+                            processed_years.append(year)
+                            break
+                except (ValueError, IndexError):
+                    continue
+        
+        # Remove duplicates and sort
+        processed_years = sorted(list(set(processed_years)))
+        missing_years = [year for year in range(start_year, end_year + 1) if year not in processed_years]
+        
+        fully_processed = len(missing_years) == 0
+        
+        if SHOW_DETAILED_CATEGORY_STATUS:
+            logger.info(f"Category '{category_name}' processing status:")
+            logger.info(f"  - Processed years: {len(processed_years)}/{end_year - start_year + 1}")
+            logger.info(f"  - Existing files: {len(existing_files)}")
+            logger.info(f"  - Fully processed: {fully_processed}")
+            
+            if processed_years:
+                logger.info(f"  - Years with data: {processed_years}")
+            if missing_years:
+                logger.info(f"  - Missing years: {missing_years[:10]}{'...' if len(missing_years) > 10 else ''}")
+        else:
+            # Just log a summary line
+            status_emoji = "✅" if fully_processed else "📋" if processed_years else "🆕"
+            logger.info(f"{status_emoji} {category_name}: {len(processed_years)}/{end_year - start_year + 1} years processed")
+        
+        return {
+            'fully_processed': fully_processed,
+            'processed_years': processed_years,
+            'missing_years': missing_years,
+            'existing_files': existing_files
+        }
+        
+    except Exception as e:
+        logger.error(f"Error checking category processing status for '{category_name}': {e}")
+        return {
+            'fully_processed': False,
+            'processed_years': [],
+            'missing_years': list(range(start_year, end_year + 1)),
+            'existing_files': []
+        }
+
+
+def analyze_all_categories_status(categories, start_year=2000, end_year=2025):
+    """
+    Analyze the processing status of all categories and provide a summary.
+    
+    Args:
+        categories (list): List of category dictionaries
+        start_year (int): Starting year to check
+        end_year (int): Ending year to check
+    
+    Returns:
+        dict: Summary statistics of all categories
+    """
+    try:
+        logger.info(f"\n{'='*80}")
+        logger.info("ANALYZING CATEGORY PROCESSING STATUS")
+        logger.info(f"{'='*80}")
+        
+        fully_processed = []
+        partially_processed = []
+        not_processed = []
+        
+        total_years_range = end_year - start_year + 1
+        total_possible_files = len(categories) * total_years_range
+        total_existing_files = 0
+        
+        for category in categories:
+            category_name = category['name']
+            status = check_category_already_processed(category_name, start_year, end_year)
+            
+            if status['fully_processed']:
+                fully_processed.append({
+                    'name': category_name,
+                    'status': status
+                })
+            elif status['processed_years']:
+                partially_processed.append({
+                    'name': category_name,
+                    'status': status
+                })
+            else:
+                not_processed.append({
+                    'name': category_name,
+                    'status': status
+                })
+            
+            total_existing_files += len(status['existing_files'])
+        
+        # Print summary
+        logger.info(f"📊 CATEGORY PROCESSING SUMMARY:")
+        logger.info(f"   • Total categories: {len(categories)}")
+        logger.info(f"   • Fully processed: {len(fully_processed)} ({len(fully_processed)/len(categories)*100:.1f}%)")
+        logger.info(f"   • Partially processed: {len(partially_processed)} ({len(partially_processed)/len(categories)*100:.1f}%)")
+        logger.info(f"   • Not processed: {len(not_processed)} ({len(not_processed)/len(categories)*100:.1f}%)")
+        logger.info(f"   • Year range: {start_year}-{end_year} ({total_years_range} years per category)")
+        logger.info(f"   • Total existing files: {total_existing_files}")
+        logger.info(f"   • Overall completion: {total_existing_files}/{total_possible_files} files ({total_existing_files/total_possible_files*100:.1f}%)")
+        
+        if fully_processed:
+            logger.info(f"\n✅ FULLY PROCESSED CATEGORIES ({len(fully_processed)}):")
+            for item in fully_processed[:5]:  # Show first 5
+                logger.info(f"   • {item['name']} ({len(item['status']['existing_files'])} files)")
+            if len(fully_processed) > 5:
+                logger.info(f"   ... and {len(fully_processed) - 5} more")
+        
+        if partially_processed:
+            logger.info(f"\n📋 PARTIALLY PROCESSED CATEGORIES ({len(partially_processed)}):")
+            for item in partially_processed[:5]:  # Show first 5
+                years_done = len(item['status']['processed_years'])
+                years_missing = len(item['status']['missing_years'])
+                logger.info(f"   • {item['name']}: {years_done}/{total_years_range} years ({years_done/(years_done+years_missing)*100:.0f}%)")
+            if len(partially_processed) > 5:
+                logger.info(f"   ... and {len(partially_processed) - 5} more")
+        
+        if not_processed:
+            logger.info(f"\n🆕 NOT PROCESSED CATEGORIES ({len(not_processed)}):")
+            for item in not_processed[:10]:  # Show first 10
+                logger.info(f"   • {item['name']}")
+            if len(not_processed) > 10:
+                logger.info(f"   ... and {len(not_processed) - 10} more")
+        
+        logger.info(f"{'='*80}")
+        
+        return {
+            'fully_processed': fully_processed,
+            'partially_processed': partially_processed,
+            'not_processed': not_processed,
+            'total_existing_files': total_existing_files,
+            'total_possible_files': total_possible_files,
+            'completion_percentage': total_existing_files/total_possible_files*100
+        }
+        
+    except Exception as e:
+        logger.error(f"Error analyzing categories status: {e}")
+        return {
+            'fully_processed': [],
+            'partially_processed': [],
+            'not_processed': categories,
+            'total_existing_files': 0,
+            'total_possible_files': len(categories) * (end_year - start_year + 1),
+            'completion_percentage': 0
+        }
+
+
 def main():
     """
     Main function to scrape categories and perform year traversal for each.
@@ -358,6 +605,9 @@ def main():
         categories_file = save_categories_info(categories)
         if categories_file:
             logger.info(f"Categories information saved to: {categories_file}")
+        
+        # Analyze current processing status of all categories
+        analysis = analyze_all_categories_status(categories)
         
         # Process each category with year traversal
         successful_categories = []
@@ -427,6 +677,9 @@ def main():
         
         print(f"\n🏁 Category scraping completed!")
         print(f"{'='*80}")
+        
+        # Analyze overall status of all categories
+        analyze_all_categories_status(categories, start_year=2000, end_year=2025)
         
         return len(failed_categories) == 0
         
